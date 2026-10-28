@@ -74,7 +74,7 @@ Requires [uv](https://docs.astral.sh/uv/).
 ### Claude Code
 
 ```bash
-claude mcp add pgs-mcp -- uvx --from git+https://github.com/<owner>/pgs-mcp pgs-mcp
+claude mcp add pgs-mcp -- uvx --from git+https://github.com/csjohnson23/pgs-mcp pgs-mcp
 ```
 
 ### Claude Desktop and other MCP clients
@@ -84,7 +84,7 @@ claude mcp add pgs-mcp -- uvx --from git+https://github.com/<owner>/pgs-mcp pgs-
   "mcpServers": {
     "pgs-mcp": {
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/<owner>/pgs-mcp", "pgs-mcp"]
+      "args": ["--from", "git+https://github.com/csjohnson23/pgs-mcp", "pgs-mcp"]
     }
   }
 }
@@ -109,7 +109,7 @@ The same QC runs from the shell, which is also a convenient way to warm the cach
 large log:
 
 ```bash
-uvx --from git+https://github.com/<owner>/pgs-mcp pgs-mcp qc summary.csv --log log.csv.gz --report
+uvx --from git+https://github.com/csjohnson23/pgs-mcp pgs-mcp qc summary.csv --log log.csv.gz --report
 ```
 
 ## Development
