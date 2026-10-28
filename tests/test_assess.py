@@ -11,6 +11,7 @@ def test_summary_only(summary):
     run = assess_match_qc(summary)
     assert not run.log_used
     assert run.chromosomes is None
+    assert _codes(run.warnings) == {"LOG_NOT_SUPPLIED"}
     assert (run.n_scores, run.n_pipeline_pass, run.n_pipeline_fail) == (3, 2, 1)
     assert all(s.log is None and not s.observations for s in run.scores)
 
@@ -63,6 +64,13 @@ def test_select_by_pgs_id_or_accession(summary):
     assert run.inferred_settings.min_overlap_lower == 0.5
 
 
+def test_selection_is_case_insensitive_and_ordered(summary, log):
+    run = assess_match_qc(summary, log, ["pgs000003", "PGS000001", "pgs000003"])
+    assert [s.pgs_id for s in run.scores] == ["PGS000003", "PGS000001"]
+    assert run.chromosomes is None  # run-wide table only for whole-run calls
+    assert {w.code for w in run.warnings} == {"CHROM_ABSENT", "TARGET_LACKS_INDELS"}
+
+
 def test_unknown_pgs_id(summary):
     with pytest.raises(QCInputError, match="PGS999999"):
         assess_match_qc(summary, pgs_ids=["PGS999999"])
@@ -77,7 +85,7 @@ def test_detail_limited_for_large_runs(summary, monkeypatch):
     monkeypatch.setattr(thresholds, "DETAIL_SCORE_LIMIT", 2)
     run = assess_match_qc(summary)
     assert run.scores == []
-    assert len(run.score_index) == 3
+    assert len(run.score_index.rows) == 3
     assert "pgs_ids" in run.detail_note
 
 

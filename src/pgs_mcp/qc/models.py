@@ -7,7 +7,7 @@ Percentages are 0-100 and always relative to the score's own variant count.
 Values are computed at full precision; rounding happens only when serialized.
 """
 
-from typing import Annotated, Any
+from typing import Annotated, Any, NamedTuple
 
 from pydantic import BaseModel, Field, PlainSerializer
 
@@ -15,6 +15,8 @@ Pct = Annotated[float, PlainSerializer(lambda v: round(v, 2), return_type=float)
 Fraction = Annotated[float, PlainSerializer(lambda v: round(v, 4), return_type=float)]
 # Effect weights span orders of magnitude, so keep significant figures, not decimals.
 Weight = Annotated[float, PlainSerializer(lambda v: float(f"{v:.4g}"), return_type=float)]
+
+N_TOP_UNMATCHED = 3
 
 
 class QCWarning(BaseModel):
@@ -45,13 +47,33 @@ class VariantMetrics(BaseModel):
     )
 
 
+class UnmatchedVariant(BaseModel):
+    chrom: str | None = Field(description="Null when the scoring file gives no position.")
+    position: int | None
+    effect_allele: str | None
+    other_allele: str | None
+    abs_weight: Weight
+
+    @property
+    def label(self) -> str:
+        """`6:32658079 A/G` (effect/other), `no position, A/G`, or `no position, effect HLA-...`."""
+        if self.other_allele:
+            alleles = f"{self.effect_allele}/{self.other_allele}"
+        else:  # effect-only entries such as HLA haplotypes may contain slashes themselves
+            alleles = f"effect {self.effect_allele}"
+        if self.chrom is None or self.position is None:
+            return f"no position, {alleles}"
+        return f"{self.chrom}:{self.position} {alleles}"
+
+
 class WeightMetrics(BaseModel):
     weight_coverage_pct: Pct | None = Field(
         description="Sum of |effect_weight| over matched variants / sum over all variants."
     )
     max_abs_weight: Weight | None
-    largest_unmatched_abs_weight: Weight | None = Field(
-        description="Largest |effect_weight| among unmatched variants; null if none unmatched."
+    largest_unmatched: list[UnmatchedVariant] = Field(
+        description=f"Up to {N_TOP_UNMATCHED} unmatched variants with the largest |effect_weight|, "
+        "largest first."
     )
 
 
@@ -83,8 +105,8 @@ class ScoreQC(BaseModel):
     observations: list[str]
 
 
-class ScoreIndexRow(BaseModel):
-    """Compact one-line view of a score, always returned for every score."""
+class ScoreIndexRow(NamedTuple):
+    """One score in the index. Serialized as an array, in this field order."""
 
     pgs_id: str
     n_variants: int
@@ -92,6 +114,13 @@ class ScoreIndexRow(BaseModel):
     matched_pct: Pct
     weight_coverage_pct: Pct | None
     warning_codes: list[str]
+
+
+class ScoreIndex(BaseModel):
+    """Every reported score, one row each, sent as a table to keep large runs small."""
+
+    columns: list[str] = Field(default=list(ScoreIndexRow._fields))
+    rows: list[ScoreIndexRow]
 
 
 class InferredSettings(BaseModel):
@@ -114,10 +143,11 @@ class RunQC(BaseModel):
     inferred_settings: InferredSettings
     log_used: bool
     chromosomes: list[ChromCoverage] | None = Field(
-        description="Run-wide coverage over score-variant pairs; a shared variant counts per score."
+        description="Run-wide coverage over score-variant pairs; a shared variant counts per "
+        "score. Null without a log, or when specific scores were requested."
     )
     warnings: list[QCWarning]
-    score_index: list[ScoreIndexRow]
+    score_index: ScoreIndex
     scores: list[ScoreQC] = Field(description="Full detail for selected scores.")
     detail_note: str | None = Field(
         default=None, description="Set when detail was limited; explains how to get more."

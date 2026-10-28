@@ -22,6 +22,19 @@ user's confidence in the calculated scores.
 5. **Say what is unknown.** Match QC describes coverage, not validity. A perfectly matched
    score can still be poorly suited to the target population.
 
+## What was supplied
+
+Check `log_used` first. **Without the match log**, only variant-level shares from the summary
+are available: weight coverage, the largest unmatched variants, per-chromosome coverage, indel
+matching and missing positions are all unknown (`LOG_NOT_SUPPLIED`). Say so plainly, and do
+not describe a score as well reproduced on variant match rate alone: a score can match 70% of
+its variants and keep 16% of its weight. Recommend re-running with the log for any score the
+user intends to rely on.
+
+Whole-run calls list every score in `score_index` (a table: `columns` names each position in
+`rows`) and leave `scores` empty for large runs; request specific scores to get their full
+detail. The run-wide chromosome table is returned only for whole-run calls.
+
 ## Metrics
 
 ### Variant match rate (`matched_pct`)
@@ -45,10 +58,16 @@ Share of the score's total |effect weight| carried by matched variants. This is 
   removes real between-person variance. Expect attenuated discrimination and distorted
   absolute risk if the score is used on its original scale.
 
-### Largest unmatched |weight|
+### Largest unmatched variants (`largest_unmatched`)
 
-When the single largest effect is unmatched, check whether it is a known lead variant for the
-trait. For small scores this alone can dominate the result.
+The unmatched variants with the largest |effect weight|, with chromosome, position and
+effect/other alleles. When the score's single largest effect is among them, say which variant
+it is and how much of the score it carries relative to `max_abs_weight`. If you know the trait,
+note whether the position falls in a well-known locus for it (HLA on 6p21, APOE on 19q13, for
+example), but present that as a lead for the user to confirm, not a finding. Variants with no
+position and multi-character alleles are often HLA alleles, copy-number or other non-SNV
+entries that positional matching cannot handle. For small scores a single lost variant can
+dominate the result.
 
 ### Strand-ambiguous variants (`ambiguous_pct`, `AMBIGUOUS_RETAINED`)
 
@@ -69,7 +88,19 @@ data. Very high rates in imputed or sequenced data suggest a strand convention p
 - `no_oa_*`: the scoring file has no other allele, so the match relied on one allele only.
   Less certain, particularly at multiallelic sites.
 - `not_best` candidates: alternative matches discarded in favour of a better one. Large
-  numbers point to multiallelic sites or split records in the target.
+  numbers point to multiallelic sites or split records in the target; when `keep_multiallelic`
+  is unknown or off, check whether those sites were handled as intended.
+- A large score matched almost entirely by one match type (e.g. all `altref`) is normal when
+  the target's REF/ALT orientation is consistent; it is not a problem in itself.
+
+### Even SNV loss across chromosomes
+
+A score can fail with no warnings at all: no indels, no ambiguous variants, no missing
+positions, just SNVs lost at a similar rate on every autosome. That pattern points to the
+scoring file's variant set being poorly covered by the target (imputation panel, post-imputation
+INFO/MAF filters, or a score built on a denser or different panel), not to a build mismatch,
+which would produce near-zero matching everywhere. Compare per-chromosome match rates in the
+score's detail to confirm the loss is even, and say the cause is inferred.
 
 ### Exclusions (`excluded_by_reason`)
 
@@ -81,7 +112,7 @@ data. Very high rates in imputed or sequenced data suggest a strand convention p
 
 | Code | What it means | Typical cause | What to suggest |
 |---|---|---|---|
-| `CHROM_ABSENT` (run) | No score variant matched on a chromosome | Target lacks the chromosome (often X/Y/MT), or labels it differently (`23` vs `X`, `chr` prefix) | Check target contigs; impute or include sex chromosomes if the score depends on them |
+| `CHROM_ABSENT` (run) | No score variant matched on a chromosome | Target lacks the chromosome (often X/Y/MT), or labels it differently (`23` vs `X`, `chr` prefix). Scoring files may themselves mix `X` and `23` | Check target contigs and labels; impute or include sex chromosomes if the score depends on them |
 | `CHROM_ABSENT` (score) | This score lost every variant on a chromosome | Usually the run-level cause; if not run-wide, sparse coverage of a region | Check `absent_run_wide` in the evidence before blaming the score |
 | `TARGET_LACKS_INDELS` | No indel matched anywhere | Array data, indels filtered out, or indels not normalised/left-aligned | Normalise indels, or accept and quantify the loss per score |
 | `INDELS_UNMATCHED` | This score's indels all failed | Usually `TARGET_LACKS_INDELS` | Look at weight coverage to judge impact |
@@ -91,6 +122,7 @@ data. Very high rates in imputed or sequenced data suggest a strand convention p
 | `SMALL_SCORE` | Few variants in the score | Score design | Every missing variant matters; read the variant list directly |
 | `BUILD_MISMATCH_SUSPECTED` | Uniformly low matching | Genome build or ID convention mismatch | Confirm target build matches the scoring files |
 | `LOG_SUMMARY_MISMATCH` | Log and summary disagree | Files from different runs | Re-run QC with files from one run before interpreting |
+| `LOG_NOT_SUPPLIED` | Only the summary was given | User omitted the log | See "What was supplied"; weight-based conclusions are impossible |
 
 ## Writing the interpretation
 

@@ -5,9 +5,11 @@ every score, and full sections for the scores returned in detail. An interpretat
 the client model (guided by the interpretation guide) is placed near the top when supplied.
 """
 
+import re
 import statistics
 from collections import Counter
 
+from pgs_mcp.qc import thresholds
 from pgs_mcp.qc.models import ChromCoverage, QCWarning, RunQC, ScoreQC
 
 
@@ -61,7 +63,11 @@ def _multi_score(run: RunQC, interpretation: str | None) -> list[str]:
         for s in run.scores:
             blocks += [f"### {s.pgs_id}", *_score_sections(s, level=4)]
     elif run.detail_note:
-        blocks.append(f"_{run.detail_note}_")
+        blocks.append(
+            "_Per-score detail is omitted for runs of more than "
+            f"{thresholds.DETAIL_SCORE_LIMIT} scores; generate the report for specific scores "
+            "to include it._"
+        )
     return blocks
 
 
@@ -82,7 +88,11 @@ def _score_sections(s: ScoreQC, level: int) -> list[str]:
         rows += [
             ("Weight coverage (share of total abs. weight matched)", _pct(w.weight_coverage_pct)),
             ("Largest abs. weight in score", _num(w.max_abs_weight)),
-            ("Largest unmatched abs. weight", _num(w.largest_unmatched_abs_weight)),
+            (
+                "Largest unmatched (effect/other, abs. weight)",
+                "; ".join(f"{v.label}, {_num(v.abs_weight)}" for v in w.largest_unmatched)
+                or "none",
+            ),
             ("SNVs matched", f"{s.log.snv_matched:,} / {s.log.snv_total:,}"),
             ("Indels/non-SNVs matched", f"{s.log.indel_matched:,} / {s.log.indel_total:,}"),
             ("Variants missing a position", f"{s.log.n_missing_position:,}"),
@@ -130,17 +140,19 @@ def _settings(run: RunQC) -> str:
 
 
 def _distribution(run: RunQC) -> str:
-    metrics = {"Variants matched (%)": [r.matched_pct for r in run.score_index]}
-    weights = [r.weight_coverage_pct for r in run.score_index if r.weight_coverage_pct is not None]
+    metrics = {"Variants matched (%)": [r.matched_pct for r in run.score_index.rows]}
+    weights = [
+        r.weight_coverage_pct for r in run.score_index.rows if r.weight_coverage_pct is not None
+    ]
     if weights:
         metrics["Weight coverage (%)"] = weights
         gaps = [
             r.weight_coverage_pct - r.matched_pct
-            for r in run.score_index
+            for r in run.score_index.rows
             if r.weight_coverage_pct is not None
         ]
         metrics["Weight minus variant coverage (points)"] = gaps
-    metrics["Variants per score"] = [r.n_variants for r in run.score_index]
+    metrics["Variants per score"] = [r.n_variants for r in run.score_index.rows]
     rows = [
         (name, _num(min(vals)), _num(statistics.median(vals)), _num(max(vals)))
         for name, vals in metrics.items()
@@ -149,15 +161,24 @@ def _distribution(run: RunQC) -> str:
 
 
 def _warning_counts(run: RunQC) -> str:
-    counts = Counter(code for r in run.score_index for code in r.warning_codes)
+    counts = Counter(code for r in run.score_index.rows for code in r.warning_codes)
     if not counts:
         return "No score-level warnings."
     return _table(("Warning", "Scores"), [(f"`{c}`", f"{n:,}") for c, n in counts.most_common()])
 
 
 def _score_table(run: RunQC) -> str:
-    rows = sorted(run.score_index, key=lambda r: r.matched_pct)
-    return "Sorted by variant match rate, lowest first.\n\n" + _table(
+    if run.log_used:
+        # Weight coverage surfaces scores that passed on variant count but lost their signal.
+        order = "weight coverage"
+        rows = sorted(
+            run.score_index.rows,
+            key=lambda r: (r.weight_coverage_pct is None, r.weight_coverage_pct or 0),
+        )
+    else:
+        order = "variant match rate"
+        rows = sorted(run.score_index.rows, key=lambda r: r.matched_pct)
+    return f"Sorted by {order}, lowest first.\n\n" + _table(
         ("Score", "Variants", "Pipeline", "Matched", "Weight coverage", "Warnings"),
         [
             (
@@ -189,8 +210,13 @@ def _warnings(warnings: list[QCWarning], empty: str) -> str:
     return "\n".join(f"- **`{w.code}`**: {w.message}" for w in warnings)
 
 
+_OWN_HEADING = re.compile(r"^#+\s*interpretation\b[^\n]*\n+", re.IGNORECASE)
+
+
 def _interpretation(text: str | None) -> str:
-    return f"## Interpretation\n\n{text.strip()}" if text and text.strip() else ""
+    """Place the model's interpretation under one heading, dropping a duplicate of its own."""
+    body = _OWN_HEADING.sub("", (text or "").strip(), count=1).strip()
+    return f"## Interpretation\n\n{body}" if body else ""
 
 
 def _facts(*pairs: tuple[str, str]) -> str:

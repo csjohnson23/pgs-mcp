@@ -20,6 +20,11 @@ def _fmt_chroms(chroms: list[ChromCoverage]) -> str:
     return ", ".join(f"{c.chrom} ({c.n_total:,})" for c in chroms)
 
 
+def _n(count: int, noun: str) -> str:
+    """`_n(1, "variant")` -> "1 variant"; `_n(2, "variant")` -> "2 variants"."""
+    return f"{count:,} {noun}" if count == 1 else f"{count:,} {noun}s"
+
+
 def score_warnings(
     n_variants: int,
     variants: VariantMetrics,
@@ -33,7 +38,7 @@ def score_warnings(
         warnings.append(
             QCWarning(
                 code="SMALL_SCORE",
-                message=f"Score has only {n_variants} variants; each one carries substantial "
+                message=f"Score has only {_n(n_variants, 'variant')}; each one carries substantial "
                 "weight, so single missing variants shift scores noticeably.",
                 evidence={
                     "n_variants": n_variants,
@@ -88,7 +93,8 @@ def score_warnings(
         warnings.append(
             QCWarning(
                 code="INDELS_UNMATCHED",
-                message=f"None of the score's {log.indel_total:,} indel/non-SNV variants matched.",
+                message=f"None of the score's {_n(log.indel_total, 'indel/non-SNV variant')} "
+                "matched.",
                 evidence={"indel_total": log.indel_total},
             )
         )
@@ -109,32 +115,39 @@ def score_warnings(
 def score_observations(variants: VariantMetrics, log: LogMetrics | None) -> list[str]:
     if log is None or variants.unmatched_pct + variants.excluded_pct == 0:
         return []
+    if variants.matched_pct == 0:
+        return ["No variant matched, so this score cannot be computed in the target data."]
     observations: list[str] = []
     w = log.weights
 
     if w.weight_coverage_pct is not None:
         gap = w.weight_coverage_pct - variants.matched_pct
-        share = "more" if gap < 0 else "less"
+        if abs(gap) < 0.05:
+            share = "about their share"
+        else:
+            share = ("more" if gap < 0 else "less") + " than their share"
         observations.append(
             f"Weight coverage is {w.weight_coverage_pct:.1f}% against a variant match rate of "
             f"{variants.matched_pct:.1f}% ({gap:+.1f} points): the variants that did not match "
-            f"carry {share} than their share of total |effect weight|."
+            f"carry {share} of total |effect weight|."
         )
 
-    if w.largest_unmatched_abs_weight is not None and w.largest_unmatched_abs_weight == (
-        w.max_abs_weight
-    ):
+    top = w.largest_unmatched
+    if top and top[0].abs_weight == w.max_abs_weight:
         observations.append(
-            f"The largest-effect variant in the score (|weight| {w.max_abs_weight:.4g}) "
-            "is unmatched."
+            f"The largest-effect variant in the score ({top[0].label}, |weight| "
+            f"{top[0].abs_weight:.4g}) is unmatched."
         )
 
-    n_unmatched_indels = log.indel_total - log.indel_matched
-    n_unmatched = (log.snv_total + log.indel_total) - (log.snv_matched + log.indel_matched)
-    if n_unmatched and n_unmatched_indels:
+    n_lost_indels = log.indel_total - log.indel_matched
+    n_lost = (log.snv_total + log.indel_total) - (log.snv_matched + log.indel_matched)
+    if n_lost_indels == n_lost == 1:
+        observations.append("The one unmatched or excluded variant is an indel/non-SNV.")
+    elif n_lost_indels == n_lost:
+        observations.append(f"All {n_lost:,} unmatched or excluded variants are indels/non-SNVs.")
+    elif n_lost_indels:
         observations.append(
-            f"{n_unmatched_indels:,} of {n_unmatched:,} unmatched or excluded variants are "
-            "indels/non-SNVs."
+            f"{n_lost_indels:,} of {n_lost:,} unmatched or excluded variants are indels/non-SNVs."
         )
     return observations
 
@@ -158,6 +171,15 @@ def run_warnings(log: LogSummary | None, matched_pcts: list[float]) -> list[QCWa
         )
 
     if log is None:
+        warnings.append(
+            QCWarning(
+                code="LOG_NOT_SUPPLIED",
+                message="No variant-level match log was supplied, so weight coverage, the "
+                "largest unmatched effects, per-chromosome coverage, indel matching and missing "
+                "positions are unknown. A score can pass on variant match rate while losing most "
+                "of its effect weight; supply the match log to check.",
+            )
+        )
         return warnings
 
     absent = absent_chromosomes(log.chromosomes)

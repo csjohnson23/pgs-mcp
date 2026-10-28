@@ -107,7 +107,8 @@ async def render_qc_report(
         str | None,
         Field(
             description="Optional Markdown interpretation to place at the top of the report, "
-            "written after reading the assess_match_qc output and the interpretation guide."
+            "written after reading the assess_match_qc output and the interpretation guide. "
+            "The report adds its own Interpretation heading."
         ),
     ] = None,
     output_path: Annotated[

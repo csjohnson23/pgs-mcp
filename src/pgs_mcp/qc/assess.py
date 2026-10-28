@@ -5,7 +5,14 @@ from pathlib import Path
 from pgs_mcp.qc import thresholds
 from pgs_mcp.qc.errors import QCInputError
 from pgs_mcp.qc.log import LogSummary, ProgressFn, aggregate_log, summarize_log
-from pgs_mcp.qc.models import InferredSettings, QCWarning, RunQC, ScoreIndexRow, ScoreQC
+from pgs_mcp.qc.models import (
+    InferredSettings,
+    QCWarning,
+    RunQC,
+    ScoreIndex,
+    ScoreIndexRow,
+    ScoreQC,
+)
 from pgs_mcp.qc.rules import absent_chromosomes, run_warnings, score_observations, score_warnings
 from pgs_mcp.qc.summary import SummaryScore, parse_accession, read_summary
 
@@ -17,7 +24,7 @@ def assess_match_qc(
     progress: ProgressFn | None = None,
 ) -> RunQC:
     """Run-wide context (inferred settings, run warnings) always uses every score in the file;
-    `pgs_ids` limits which scores are reported."""
+    `pgs_ids` limits which scores are reported, in the order given."""
     summary = read_summary(_existing(summary_path))
     selected = _select(summary, pgs_ids)
     inferred = _infer_settings(summary)
@@ -48,9 +55,9 @@ def assess_match_qc(
         n_pipeline_fail=sum(not s.pipeline_pass for s in scores),
         inferred_settings=inferred,
         log_used=log is not None,
-        chromosomes=log.chromosomes if log else None,
+        chromosomes=log.chromosomes if log and not pgs_ids else None,
         warnings=integrity + run_warnings(log, [s.metrics().matched_pct for s in summary]),
-        score_index=[_index_row(s) for s in scores],
+        score_index=ScoreIndex(rows=[_index_row(s) for s in scores]),
         scores=detailed,
         detail_note=note,
     )
@@ -64,14 +71,21 @@ def _existing(path: Path) -> Path:
 
 
 def _select(summary: list[SummaryScore], pgs_ids: list[str] | None) -> list[SummaryScore]:
+    """Match PGS IDs or accessions case-insensitively, keeping the requested order."""
     if not pgs_ids:
         return summary
-    wanted = set(pgs_ids)
-    selected = [
-        s for s in summary if s.accession in wanted or parse_accession(s.accession)[0] in wanted
-    ]
-    found = {s.accession for s in selected} | {parse_accession(s.accession)[0] for s in selected}
-    unknown = sorted(wanted - found)
+    by_key: dict[str, SummaryScore] = {}
+    for s in summary:
+        by_key[s.accession.lower()] = s
+        by_key.setdefault(parse_accession(s.accession)[0].lower(), s)
+    selected: list[SummaryScore] = []
+    unknown: list[str] = []
+    for requested in pgs_ids:
+        match = by_key.get(requested.strip().lower())
+        if match is None:
+            unknown.append(requested)
+        elif match not in selected:
+            selected.append(match)
     if unknown:
         raise QCInputError(
             f"Not in this match summary: {', '.join(unknown)}. "

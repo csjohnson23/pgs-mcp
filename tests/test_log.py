@@ -16,7 +16,9 @@ def test_weights_and_variant_classes(log):
     one = _summary(log).scores["PGS000001_hmPOS_GRCh38"]
     assert one.weights.weight_coverage_pct == pytest.approx(100 * 0.41 / 0.91)
     assert one.weights.max_abs_weight == pytest.approx(0.5)
-    assert one.weights.largest_unmatched_abs_weight == pytest.approx(0.5)
+    [top] = one.weights.largest_unmatched
+    assert top.abs_weight == pytest.approx(0.5)
+    assert top.label == "7:10000 AT/A"
     assert (one.snv_total, one.snv_matched, one.indel_total, one.indel_matched) == (9, 9, 1, 0)
     assert one.n_not_best_candidates == 1
     assert one.match_types["no_oa_alt"] == 1
@@ -60,14 +62,19 @@ def test_cache_reused_until_file_changes(log, tmp_path, isolated_cache):
     copy = tmp_path / "log.csv"
     copy.write_bytes(log.read_bytes())
     aggregate_log(copy)
-    assert len(list(isolated_cache.glob("*.parquet"))) == 1
+    assert len(list(isolated_cache.glob("*-groups.parquet"))) == 1
     aggregate_log(copy)
-    assert len(list(isolated_cache.glob("*.parquet"))) == 1
+    assert len(list(isolated_cache.glob("*-groups.parquet"))) == 1
     copy.write_bytes(log.read_bytes() + log.read_bytes().splitlines(keepends=True)[1])
     aggregate_log(copy)
-    assert len(list(isolated_cache.glob("*.parquet"))) == 2
+    assert len(list(isolated_cache.glob("*-groups.parquet"))) == 2
 
 
 def test_rejects_non_log(summary):
     with pytest.raises(QCInputError, match="not a pgsc_calc match log"):
         aggregate_log(summary)
+
+
+def test_missing_position_variant_label(log):
+    [top] = _summary(log).scores["PGS000003_hmPOS_GRCh38"].weights.largest_unmatched
+    assert top.label == "no position, T/C"

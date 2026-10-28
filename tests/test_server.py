@@ -38,6 +38,9 @@ async def test_assess_returns_structured_result(summary, log):
     detail = {sc["pgs_id"]: sc for sc in result.structured_content["scores"]}
     assert detail["PGS000001"]["log"]["weights"]["weight_coverage_pct"] == 45.05
     assert result.structured_content["inferred_settings"]["min_overlap_upper"] == 0.75
+    index = result.structured_content["score_index"]
+    assert index["columns"][0] == "pgs_id"
+    assert index["rows"][0][:3] == ["PGS000001", 10, True]
 
 
 async def test_bad_path_is_a_tool_error(tmp_path):

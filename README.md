@@ -47,7 +47,8 @@ Both tools take explicit paths to pgsc_calc outputs:
 ### What you get back
 
 Per score: variant match rate, unambiguous match rate, strand-ambiguous and flipped shares,
-exclusions by reason, effect weight coverage, largest unmatched effect, SNV and indel match
+exclusions by reason, effect weight coverage, the largest-effect unmatched variants (position
+and alleles), SNV and indel match
 counts, match types and per-chromosome coverage. Per run: the inferred `min_overlap`,
 `keep_ambiguous` and `keep_multiallelic` settings and run-wide coverage.
 
@@ -62,6 +63,7 @@ Warnings flag structural problems and almost all are categorical, with no tunabl
 | `DUPLICATES_EXCLUDED` | Variants were dropped for duplicate IDs or tied best matches |
 | `AMBIGUOUS_RETAINED` | Strand-ambiguous variants were kept |
 | `LOG_SUMMARY_MISMATCH` | The log and summary appear to come from different runs |
+| `LOG_NOT_SUPPLIED` | Only the summary was given, so weight-based metrics are unavailable |
 | `SMALL_SCORE` | Fewer than 20 variants (cutoff reported in evidence) |
 | `BUILD_MISMATCH_SUSPECTED` | Median match rate below 20% (cutoff reported in evidence) |
 
@@ -98,7 +100,10 @@ Ask your assistant, for example:
 > Assess the match QC for `/data/run1/PROFILE_summary.csv` with the log
 > `/data/run1/PROFILE_log.csv.gz`, and explain which scores I should be careful with.
 
-Or pick the `interpret_match_qc` prompt in your client.
+Or run the `interpret_match_qc` prompt. MCP prompts are started by the user, not the model: in
+Claude Code type `/mcp__pgs-mcp__interpret_match_qc`; in Claude Desktop it is listed under the
+connected server in the message box. Plain requests work just as well, since the tools point
+the model to the interpretation guide.
 
 The same QC runs from the shell, which is also a convenient way to warm the cache for a very
 large log:
