@@ -1,5 +1,7 @@
 """End-to-end through the MCP protocol, using the SDK's in-process client."""
 
+import json
+
 import pytest
 from mcp.client import Client
 
@@ -18,6 +20,7 @@ async def test_lists_tools_resource_and_prompt():
         assert [str(r.uri) for r in resources] == [GUIDE_URI]
         prompts = (await client.list_prompts()).prompts
         assert [p.name for p in prompts] == ["interpret_match_qc"]
+        assert all(arg.description for arg in prompts[0].arguments)
 
 
 async def test_assess_returns_structured_result(summary, log):
@@ -28,6 +31,13 @@ async def test_assess_returns_structured_result(summary, log):
     assert not result.is_error
     assert result.structured_content["n_scores"] == 3
     assert result.structured_content["log_used"] is True
+    text = result.content[0].text
+    assert "\n" not in text  # compact: this is the block clients hand the model
+    assert json.loads(text) == result.structured_content
+    # Rounded on the wire: 100 * 0.41 / 0.91 = 45.0549...
+    detail = {sc["pgs_id"]: sc for sc in result.structured_content["scores"]}
+    assert detail["PGS000001"]["log"]["weights"]["weight_coverage_pct"] == 45.05
+    assert result.structured_content["inferred_settings"]["min_overlap_upper"] == 0.75
 
 
 async def test_bad_path_is_a_tool_error(tmp_path):

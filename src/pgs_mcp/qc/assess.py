@@ -149,11 +149,7 @@ def _index_row(s: ScoreQC) -> ScoreIndexRow:
         pgs_id=s.pgs_id,
         n_variants=s.n_variants,
         pipeline_pass=s.pipeline_pass,
-        matched_pct=round(s.variants.matched_pct, 2),
-        weight_coverage_pct=(
-            round(s.log.weights.weight_coverage_pct, 2)
-            if s.log and s.log.weights.weight_coverage_pct is not None
-            else None
-        ),
+        matched_pct=s.variants.matched_pct,
+        weight_coverage_pct=s.log.weights.weight_coverage_pct if s.log else None,
         warning_codes=[w.code for w in s.warnings],
     )

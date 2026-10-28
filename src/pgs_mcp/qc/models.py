@@ -3,11 +3,18 @@
 Every metric is reported raw. Warnings flag structural problems (mostly categorical, no
 cutoff); observations are mechanical, descriptive statements. Neither is a verdict.
 Percentages are 0-100 and always relative to the score's own variant count.
+
+Values are computed at full precision; rounding happens only when serialized.
 """
 
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PlainSerializer
+
+Pct = Annotated[float, PlainSerializer(lambda v: round(v, 2), return_type=float)]
+Fraction = Annotated[float, PlainSerializer(lambda v: round(v, 4), return_type=float)]
+# Effect weights span orders of magnitude, so keep significant figures, not decimals.
+Weight = Annotated[float, PlainSerializer(lambda v: float(f"{v:.4g}"), return_type=float)]
 
 
 class QCWarning(BaseModel):
@@ -26,12 +33,12 @@ class ChromCoverage(BaseModel):
 class VariantMetrics(BaseModel):
     """From the match summary: share of the score's variants in each state."""
 
-    matched_pct: float
-    matched_unambiguous_pct: float
-    ambiguous_pct: float = Field(description="Strand-ambiguous variants, matched or excluded.")
-    flipped_pct: float = Field(description="Matched only after flipping strand.")
-    excluded_pct: float
-    unmatched_pct: float
+    matched_pct: Pct
+    matched_unambiguous_pct: Pct
+    ambiguous_pct: Pct = Field(description="Strand-ambiguous variants, matched or excluded.")
+    flipped_pct: Pct = Field(description="Matched only after flipping strand.")
+    excluded_pct: Pct
+    unmatched_pct: Pct
     excluded_by_reason: dict[str, int] = Field(
         default_factory=dict,
         description="Excluded variant counts per flag; a variant can carry several flags.",
@@ -39,11 +46,11 @@ class VariantMetrics(BaseModel):
 
 
 class WeightMetrics(BaseModel):
-    weight_coverage_pct: float | None = Field(
+    weight_coverage_pct: Pct | None = Field(
         description="Sum of |effect_weight| over matched variants / sum over all variants."
     )
-    max_abs_weight: float | None
-    largest_unmatched_abs_weight: float | None = Field(
+    max_abs_weight: Weight | None
+    largest_unmatched_abs_weight: Weight | None = Field(
         description="Largest |effect_weight| among unmatched variants; null if none unmatched."
     )
 
@@ -82,16 +89,16 @@ class ScoreIndexRow(BaseModel):
     pgs_id: str
     n_variants: int
     pipeline_pass: bool
-    matched_pct: float
-    weight_coverage_pct: float | None
+    matched_pct: Pct
+    weight_coverage_pct: Pct | None
     warning_codes: list[str]
 
 
 class InferredSettings(BaseModel):
-    min_overlap_lower: float | None = Field(
+    min_overlap_lower: Fraction | None = Field(
         description="Highest match rate (fraction) among failing scores: min_overlap is above it."
     )
-    min_overlap_upper: float | None = Field(
+    min_overlap_upper: Fraction | None = Field(
         description="Lowest match rate (fraction) among passing scores: min_overlap is at most it."
     )
     keep_ambiguous: bool | None

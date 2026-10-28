@@ -11,7 +11,7 @@ import anyio.from_thread
 import anyio.to_thread
 from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
-from mcp.types import ToolAnnotations
+from mcp.types import CallToolResult, TextContent, ToolAnnotations
 from pydantic import Field
 
 from pgs_mcp.qc import QCInputError
@@ -40,7 +40,7 @@ LogPath = Annotated[
     Field(
         description="Optional path to the variant-level match log, e.g. "
         "`{sampleset}_log.csv.gz`. Enables weight, chromosome, indel and match-type metrics. "
-        "Large logs take minutes on first read, then are cached."
+        "The first read of a large log takes about a minute per few GB; it is then cached."
     ),
 ]
 PgsIds = Annotated[
@@ -58,7 +58,8 @@ async def _assess(
     summary_path: str, log_path: str | None, pgs_ids: list[str] | None, ctx: Context
 ) -> RunQC:
     def progress(done: int, total: int) -> None:
-        anyio.from_thread.run(ctx.report_progress, done, total, "Reading match log")
+        message = f"Reading match log: {_size(done)} of {_size(total)}"
+        anyio.from_thread.run(ctx.report_progress, done, total, message)
 
     try:
         return await anyio.to_thread.run_sync(
@@ -70,13 +71,17 @@ async def _assess(
         raise ToolError(str(e)) from e  # input problems go back to the model; crashes do not
 
 
+def _size(n_bytes: int) -> str:
+    return f"{n_bytes / 1e9:.1f} GB" if n_bytes >= 1e9 else f"{n_bytes / 1e6:.0f} MB"
+
+
 @mcp.tool(annotations=READ_ONLY)
 async def assess_match_qc(
     summary_path: SummaryPath,
     ctx: Context,
     log_path: LogPath = None,
     pgs_ids: PgsIds = None,
-) -> RunQC:
+) -> Annotated[CallToolResult, RunQC]:
     """Assess how well polygenic scores matched a target genotype dataset in pgsc_calc.
 
     Works for a single score or a whole run. Returns raw metrics (variant match rate, weight
@@ -84,7 +89,12 @@ async def assess_match_qc(
     descriptive observations. Large runs return a compact index of every score; request
     specific pgs_ids for full detail. Interpret with the guide at pgs://guides/match-qc.
     """
-    return await _assess(summary_path, log_path, pgs_ids, ctx)
+    run = await _assess(summary_path, log_path, pgs_ids, ctx)
+    # The text block is what most clients show the model: send it compact, not indented.
+    return CallToolResult(
+        content=[TextContent(type="text", text=run.model_dump_json())],
+        structured_content=run.model_dump(mode="json"),
+    )
 
 
 @mcp.tool(annotations=ToolAnnotations(read_only_hint=False, open_world_hint=False))
@@ -133,11 +143,18 @@ def match_qc_guide() -> str:
 
 
 @mcp.prompt(title="Interpret pgsc_calc match QC")
-def interpret_match_qc(summary_path: str, log_path: str = "", pgs_ids: str = "") -> str:
-    """Assess pgsc_calc match QC and write a guided interpretation of the results.
-
-    pgs_ids is an optional comma-separated list.
-    """
+def interpret_match_qc(
+    summary_path: Annotated[
+        str, Field(description="Path to the pgsc_calc match summary (`*_summary.csv`).")
+    ],
+    log_path: Annotated[
+        str, Field(description="Optional path to the variant-level match log (`*_log.csv.gz`).")
+    ] = "",
+    pgs_ids: Annotated[
+        str, Field(description="Optional comma-separated PGS IDs; blank for every score.")
+    ] = "",
+) -> str:
+    """Assess pgsc_calc match QC and write a guided interpretation of the results."""
     args = [f"summary_path={summary_path!r}"]
     if log_path:
         args.append(f"log_path={log_path!r}")

@@ -63,7 +63,7 @@ def score_warnings(
                 code="AMBIGUOUS_RETAINED",
                 message=f"{variants.ambiguous_pct:.1f}% of variants are strand-ambiguous "
                 "(A/T or C/G) and were kept; their effect allele cannot be confirmed by strand.",
-                evidence={"ambiguous_pct": round(variants.ambiguous_pct, 3)},
+                evidence={"ambiguous_pct": round(variants.ambiguous_pct, 2)},
             )
         )
 
@@ -151,7 +151,7 @@ def run_warnings(log: LogSummary | None, matched_pcts: list[float]) -> list[QCWa
                 "low matching usually means the scoring files and target data use different "
                 "genome builds or variant ID conventions.",
                 evidence={
-                    "median_matched_pct": round(median, 3),
+                    "median_matched_pct": round(median, 2),
                     "threshold": thresholds.BUILD_MISMATCH_MEDIAN_MATCHED_PCT,
                 },
             )

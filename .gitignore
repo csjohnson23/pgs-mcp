@@ -11,3 +11,6 @@ build/
 # Never commit real genotype-derived outputs; tests use synthetic fixtures only.
 *.csv.gz
 !tests/fixtures/*.csv.gz
+
+# Local dev tooling (contains machine-specific paths)
+.claude/
