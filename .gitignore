@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/
+.DS_Store
+
+# Never commit real genotype-derived outputs; tests use synthetic fixtures only.
+*.csv.gz
+!tests/fixtures/*.csv.gz

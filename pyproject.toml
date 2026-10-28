@@ -1,0 +1,38 @@
+[project]
+name = "pgs-mcp"
+version = "0.1.0"
+description = "MCP server for polygenic score quality control: standardized pgsc_calc match QC and score context."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+keywords = ["mcp", "polygenic score", "pgs", "pgsc_calc", "pgs catalog", "genomics"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+dependencies = [
+    "mcp>=2.3,<3",
+    "polars>=1.0",
+    "pydantic>=2.7",
+]
+
+[project.scripts]
+pgs-mcp = "pgs_mcp.__main__:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
