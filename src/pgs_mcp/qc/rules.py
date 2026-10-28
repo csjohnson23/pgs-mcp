@@ -103,7 +103,7 @@ def score_warnings(
         warnings.append(
             QCWarning(
                 code="MISSING_POSITION",
-                message="Variants with no chromosome or position in the scoring file, which "
+                message="Variants missing a chromosome or position in the scoring file, which "
                 f"cannot be matched by position: {log.n_missing_position:,}.",
                 evidence={"n_missing_position": log.n_missing_position},
             )
@@ -112,7 +112,27 @@ def score_warnings(
     return warnings
 
 
-def score_observations(variants: VariantMetrics, log: LogMetrics | None) -> list[str]:
+def _autosome_range(chromosomes: list[ChromCoverage]) -> str | None:
+    """Spread of per-autosome match rates: narrow means even loss, wide means regional loss."""
+    rates = [
+        (100 * c.n_matched / c.n_total, c.chrom)
+        for c in chromosomes
+        if c.n_total and c.chrom.isdigit() and 1 <= int(c.chrom) <= 22
+    ]
+    if len(rates) < 2:
+        return None
+    (low, low_chrom), (high, high_chrom) = min(rates), max(rates)
+    if f"{low:.1f}" == f"{high:.1f}":
+        return f"Variant match rate is {low:.1f}% on each of the {len(rates)} autosomes."
+    return (
+        f"Variant match rate per autosome ranges from {low:.1f}% (chr{low_chrom}) to "
+        f"{high:.1f}% (chr{high_chrom}) across {len(rates)} autosomes."
+    )
+
+
+def score_observations(
+    n_variants: int, variants: VariantMetrics, log: LogMetrics | None
+) -> list[str]:
     if log is None or variants.unmatched_pct + variants.excluded_pct == 0:
         return []
     if variants.matched_pct == 0:
@@ -134,10 +154,15 @@ def score_observations(variants: VariantMetrics, log: LogMetrics | None) -> list
 
     top = w.largest_unmatched
     if top and top[0].abs_weight == w.max_abs_weight:
+        share = 100 * top[0].abs_weight / w.total_abs_weight if w.total_abs_weight else 0
         observations.append(
             f"The largest-effect variant in the score ({top[0].label}, |weight| "
-            f"{top[0].abs_weight:.4g}) is unmatched."
+            f"{top[0].abs_weight:.4g}, {share:.2g}% of total |weight|) is unmatched."
         )
+
+    autosome_range = _autosome_range(log.chromosomes)
+    if autosome_range and n_variants >= thresholds.SMALL_SCORE_MAX_VARIANTS:
+        observations.append(autosome_range)
 
     n_lost_indels = log.indel_total - log.indel_matched
     n_lost = (log.snv_total + log.indel_total) - (log.snv_matched + log.indel_matched)

@@ -70,6 +70,7 @@ class WeightMetrics(BaseModel):
     weight_coverage_pct: Pct | None = Field(
         description="Sum of |effect_weight| over matched variants / sum over all variants."
     )
+    total_abs_weight: Weight = Field(description="Sum of |effect_weight| over all variants.")
     max_abs_weight: Weight | None
     largest_unmatched: list[UnmatchedVariant] = Field(
         description=f"Up to {N_TOP_UNMATCHED} unmatched variants with the largest |effect_weight|, "
@@ -87,7 +88,9 @@ class LogMetrics(BaseModel):
     )
     snv_total: int
     snv_matched: int
-    indel_total: int = Field(description="Indels and other non-SNV variants.")
+    indel_total: int = Field(
+        description="Indels and other non-SNV entries (e.g. HLA alleles, presence/absence codes)."
+    )
     indel_matched: int
     n_missing_position: int
     chromosomes: list[ChromCoverage]

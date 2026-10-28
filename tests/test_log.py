@@ -75,6 +75,20 @@ def test_rejects_non_log(summary):
         aggregate_log(summary)
 
 
+def test_non_nucleotide_alleles_are_not_snvs(tmp_path, log):
+    lines = log.read_text().splitlines(keepends=True)
+    coded = [
+        line.replace(",A,G,0.1,", ",P,N,0.1,")
+        if "PGS000003" in line and ",10,100," in line
+        else line
+        for line in lines
+    ]
+    path = tmp_path / "coded.csv"
+    path.write_text("".join(coded))
+    three = _summary(path).scores["PGS000003_hmPOS_GRCh38"]
+    assert (three.snv_total, three.indel_total) == (3, 1)
+
+
 def test_missing_position_variant_label(log):
     [top] = _summary(log).scores["PGS000003_hmPOS_GRCh38"].weights.largest_unmatched
     assert top.label == "no position, T/C"

@@ -152,11 +152,17 @@ def _distribution(run: RunQC) -> str:
             if r.weight_coverage_pct is not None
         ]
         metrics["Weight minus variant coverage (points)"] = gaps
-    metrics["Variants per score"] = [r.n_variants for r in run.score_index.rows]
     rows = [
-        (name, _num(min(vals)), _num(statistics.median(vals)), _num(max(vals)))
+        (name, *(f"{v:.2f}" for v in (min(vals), statistics.median(vals), max(vals))))
         for name, vals in metrics.items()
     ]
+    counts = [r.n_variants for r in run.score_index.rows]
+    rows.append(
+        (
+            "Variants per score",
+            *(f"{v:,.0f}" for v in (min(counts), statistics.median(counts), max(counts))),
+        )
+    )
     return _table(("Metric", "Min", "Median", "Max"), rows)
 
 

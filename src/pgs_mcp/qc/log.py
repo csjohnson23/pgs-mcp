@@ -41,7 +41,8 @@ COLUMNS = (
 GROUP_KEYS = ["accession", "chr_name", "is_snv", "missing_position", "match_status", "match_type"]
 CHUNK_BYTES = 256 * 1024 * 1024
 VARIANT_COLUMNS = ["accession", "chr_name", "chr_position", "effect_allele", "other_allele"]
-CACHE_VERSION = 2  # bump when a cached table's shape or meaning changes
+CACHE_VERSION = 3  # bump when a cached table's shape or meaning changes
+SNV_ALLELE = r"^[ACGTacgt]$"
 
 
 @dataclass
@@ -127,8 +128,9 @@ def _aggregate_chunk(chunk: bytes) -> LogAggregate:
     )
     groups = (
         rows.with_columns(
-            is_snv=(pl.col("effect_allele").str.len_chars().fill_null(0) <= 1)
-            & (pl.col("other_allele").str.len_chars().fill_null(0) <= 1),
+            # SNV = one nucleotide on each side; codes such as P/N or HLA alleles are not.
+            is_snv=pl.col("effect_allele").str.contains(SNV_ALLELE).fill_null(False)
+            & pl.col("other_allele").str.contains(SNV_ALLELE).fill_null(True),
             missing_position=pl.col("chr_name").is_null() | pl.col("chr_position").is_null(),
         )
         .group_by(GROUP_KEYS)
@@ -169,6 +171,7 @@ class _ScoreAccumulator:
         return LogMetrics(
             weights=WeightMetrics(
                 weight_coverage_pct=100 * self.w_matched / self.w_total if self.w_total else None,
+                total_abs_weight=self.w_total,
                 max_abs_weight=self.w_max,
                 largest_unmatched=self.top_unmatched,
             ),

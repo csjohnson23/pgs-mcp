@@ -100,7 +100,8 @@ positions, just SNVs lost at a similar rate on every autosome. That pattern poin
 scoring file's variant set being poorly covered by the target (imputation panel, post-imputation
 INFO/MAF filters, or a score built on a denser or different panel), not to a build mismatch,
 which would produce near-zero matching everywhere. Compare per-chromosome match rates in the
-score's detail to confirm the loss is even, and say the cause is inferred.
+score's detail, or the per-autosome range observation, to confirm the loss is even, and say
+the cause is inferred.
 
 ### Exclusions (`excluded_by_reason`)
 

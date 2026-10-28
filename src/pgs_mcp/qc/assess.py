@@ -154,7 +154,7 @@ def _score_qc(
         variants=variants,
         log=log_metrics,
         warnings=score_warnings(s.n_variants, variants, log_metrics, keep_ambiguous, run_absent),
-        observations=score_observations(variants, log_metrics),
+        observations=score_observations(s.n_variants, variants, log_metrics),
     )
 
 
