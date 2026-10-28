@@ -1,21 +1,20 @@
 # pgs-mcp
 
-An [MCP](https://modelcontextprotocol.io) server that checks how faithfully polygenic scores were
-reproduced in your genotype data by [pgsc_calc](https://github.com/PGScatalog/pgsc_calc), and
-explains what was lost and why.
+An MCP server that evaluates polygenic score matching from [pgsc_calc](https://github.com/PGScatalog/pgsc_calc) in a target population, flags matching warnings and silent errors, and contextualizes findings into a user report.  
 
-pgsc_calc passes or fails each score on a single number: the share of its variants found in your
-data. That number can hide a lot. A score can match 72% of its variants and pass, while keeping
-only 16% of its total effect weight, because the variants it lost were the large-effect ones.
-pgs-mcp reads pgsc_calc's matching outputs and gives your AI assistant the full picture: weight
-coverage, which variants were lost, where, and the likely upstream cause, for one score or a run
-of hundreds.
+The pgsc_calc package passes or fails each polygenic score based on a single number: variant match rate. However, the percentage of variants matched is an incomplete picture of matching accuracy. 
+
+For example: A score can match a threshold-passing percentage of its variants, say 72%, while keeping
+only 16% of the total effect weight, because the unmatched variants were the large-effect ones. 
+
+This server reads pgsc_calc's matching outputs and gives the full picture: weight
+coverage, which variants were lost, where, and the likely upstream cause, as well as analysis of strand flips, ambiguous alleles, and missing data. It gives recommendations for scores to drop from analysis even if they passed the threshold, as well as upstream data checks to reduce unmatched variants. The tools are adaptable to one score or a run of hundreds. 
 
 ## Requirements
 
 - [uv](https://docs.astral.sh/uv/) (`brew install uv`, or see the uv docs)
-- An MCP client, such as Claude Code or Claude Desktop
-- Output from a pgsc_calc run
+- An MCP client, such as Claude Code
+- Match log and match summary files from a pgsc_calc run (specifically, the match_variants step ahead of pgs calculation)
 
 ## Install
 
@@ -25,7 +24,7 @@ of hundreds.
 claude mcp add pgs-mcp -- uvx --from git+https://github.com/csjohnson23/pgs-mcp pgs-mcp
 ```
 
-**Claude Desktop and other MCP clients:** add this to your client's MCP configuration (for Claude
+**Other MCP clients:** add this to your client's MCP configuration (for Claude
 Desktop, `claude_desktop_config.json`) and restart the client.
 
 ```json
@@ -39,7 +38,7 @@ Desktop, `claude_desktop_config.json`) and restart the client.
 }
 ```
 
-The server runs locally. Your files are read on your machine, and it makes no network calls.
+The server runs locally.
 
 ## Find your inputs
 
@@ -50,14 +49,13 @@ results/<sampleset>/match/<sampleset>_summary.csv   match summary (required)
 results/<sampleset>/match/<sampleset>_log.csv.gz    variant-level match log (recommended)
 ```
 
-The summary alone gives each score's variant match rate. The log adds effect weight coverage, the
+The log is required for effect weight coverage, the
 largest lost variants, per-chromosome coverage and indel matching, which is where most problems
-show up. Logs can run to several GB: the first read takes about a minute for 3.5 GB and is cached,
-so later questions about the same run are instant.
+show up. The first log read is cached, but expect initial runtime of up to a minute for larger logs (>3GB). 
 
 ## Use
 
-Ask your assistant in plain language, with the paths to your files. For example:
+Ask your assistant for pgs matching analysis in plain language, with the paths to your files. For example:
 
 > Check the match QC for `results/cohort/match/cohort_summary.csv` with the log
 > `results/cohort/match/cohort_log.csv.gz`. Which scores should I be careful with, and why?
