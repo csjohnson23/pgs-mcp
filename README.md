@@ -40,9 +40,9 @@ Desktop, `claude_desktop_config.json`) and restart the client.
 
 The server runs locally.
 
-## Find your inputs
+## Inputs
 
-pgsc_calc writes both files to the `match/` folder for each sampleset:
+pgsc_calc writes both files for this MCP to the `match/` folder for each sampleset:
 
 ```
 results/<sampleset>/match/<sampleset>_summary.csv   match summary (required)
@@ -53,7 +53,7 @@ The log is required for effect weight coverage, the
 largest lost variants, per-chromosome coverage and indel matching, which is where most problems
 show up. The first log read is cached, but expect initial runtime of up to a minute for larger logs (>3GB). 
 
-## Use
+## Usage
 
 Ask your assistant for pgs matching analysis in plain language, with the paths to your files. For example:
 
@@ -72,7 +72,7 @@ You can also start the guided interpretation directly: in Claude Code type
 `/mcp__pgs-mcp__interpret_match_qc`; in Claude Desktop it is listed under the connected server in
 the message box.
 
-## What you get back
+## Outputs
 
 The server reports measurements, never grades. Your assistant interprets them using an
 [interpretation guide](src/pgs_mcp/guides/match_qc.md) that ships with the server, and is told
@@ -109,7 +109,7 @@ chromosome coverage and a table of every score sorted by weight coverage.
 
 ## Command line
 
-The same checks run without an assistant, which is also a quick way to pre-read a large log:
+The same checks can run without an assistant, which is also a quick way to pre-read a large log:
 
 ```bash
 uvx --from git+https://github.com/csjohnson23/pgs-mcp pgs-mcp qc cohort_summary.csv --log cohort_log.csv.gz --report > qc_report.md
@@ -128,20 +128,8 @@ Add `--pgs-id PGS000316` (repeatable) for specific scores, or drop `--report` fo
 - **Cache:** aggregated log data is stored in `~/.cache/pgs-mcp` (set `PGS_MCP_CACHE_DIR` to
   move it). It is small and safe to delete.
 
-## Contributing
-
-Issues and pull requests are welcome, especially improvements to the
-[interpretation guide](src/pgs_mcp/guides/match_qc.md) from PGS practitioners.
-
-```bash
-uv sync
-uv run pytest
-uv run ruff check . && uv run ruff format --check .
-```
-
-The QC logic in `src/pgs_mcp/qc/` is plain Python, independent of MCP; `server.py` only exposes
-it. Tests use small synthetic pgsc_calc outputs in `tests/fixtures/`; no real genotype-derived data
-is committed.
+The QC logic in `src/pgs_mcp/qc/` is plain Python, independent of MCP. 
+Tests use small synthetic pgsc_calc outputs in `tests/fixtures'
 
 ## License
 
