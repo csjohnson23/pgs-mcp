@@ -1,5 +1,7 @@
 # pgs-mcp
 
+[![CI](https://github.com/csjohnson23/pgs-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/csjohnson23/pgs-mcp/actions/workflows/ci.yml)
+
 An MCP server that evaluates polygenic score matching from [pgsc_calc](https://github.com/PGScatalog/pgsc_calc) in a target population, flags matching warnings and silent errors, and contextualizes findings into a user report.  
 
 The pgsc_calc package passes or fails each polygenic score based on a single number: variant match rate. However, the percentage of variants matched is an incomplete picture of matching accuracy. 
@@ -38,7 +40,10 @@ Desktop, `claude_desktop_config.json`) and restart the client.
 }
 ```
 
-The server runs locally.
+The server runs locally, so your match files stay on your machine. pgsc_calc's match files
+describe variants, not people, and hold no individual genotypes. Only per-score summaries,
+such as match rates, weight coverage and the positions of the largest unmatched score variants,
+are passed to your assistant.
 
 ## Inputs
 
@@ -55,7 +60,7 @@ show up. The first log read is cached, but expect initial runtime of up to a min
 
 ## Usage
 
-Ask your assistant for pgs matching analysis in plain language, with the paths to your files. For example:
+Ask your assistant for PGS matching analysis in plain language, with the paths to your files. For example:
 
 > Check the match QC for `results/cohort/match/cohort_summary.csv` with the log
 > `results/cohort/match/cohort_log.csv.gz`. Which scores should I be careful with, and why?
@@ -71,6 +76,41 @@ specific scores for full detail.
 You can also start the guided interpretation directly: in Claude Code type
 `/mcp__pgs-mcp__interpret_match_qc`; in Claude Desktop it is listed under the connected server in
 the message box.
+
+## Example
+
+[`examples/`](examples) holds a small synthetic run: three made-up scores matched against a target
+that looks like imputed array data, with no chrX and no indels. pgsc_calc passes all three. To try
+it in about a minute:
+
+```bash
+git clone https://github.com/csjohnson23/pgs-mcp && cd pgs-mcp
+uv run pgs-mcp qc examples/example_summary.csv --log examples/example_log.csv --report
+```
+
+Or, with the server installed, ask your assistant to check the match QC for
+`examples/example_summary.csv` with the log `examples/example_log.csv`.
+
+From the [report](examples/example_report.md), trimmed and with score names shortened:
+
+> **Run-wide warnings**
+> - **`CHROM_ABSENT`**: No score variant found in the target on chromosome(s) X (10).
+> - **`TARGET_LACKS_INDELS`**: 0 of 7 indel/non-SNV score variants matched while 153 SNVs did.
+>
+> | Score | Variants | Pipeline | Matched | Weight coverage | Warnings |
+> |---|---|---|---|---|---|
+> | hla_small | 15 | pass | 80.0% | 25.3% | SMALL_SCORE, INDELS_UNMATCHED, MISSING_POSITION |
+> | large_effect_loss | 100 | pass | 82.0% | 47.8% | AMBIGUOUS_RETAINED, CHROM_ABSENT, INDELS_UNMATCHED |
+> | mostly_clean | 60 | pass | 98.3% | 98.8% | |
+
+Claude's interpretation, written from the tool output and the interpretation guide:
+
+> All three scores passed pgsc_calc, but only `mostly_clean` kept its signal: it lost one small
+> variant and 1.2% of its weight. `large_effect_loss` matched 82% of its variants but kept 48% of its
+> weight, because the target has no chrX and no indels, and its four indels are its largest-effect
+> variants. `hla_small` kept 25% of its weight: its three HLA alleles have no genomic position, so
+> pgsc_calc cannot match them. I would not use those two as is. Check whether chrX and indels were
+> dropped during imputation or QC, and score HLA alleles separately with HLA imputation.
 
 ## Outputs
 
@@ -129,7 +169,7 @@ Add `--pgs-id PGS000316` (repeatable) for specific scores, or drop `--report` fo
   move it). It is small and safe to delete.
 
 The QC logic in `src/pgs_mcp/qc/` is plain Python, independent of MCP. 
-Tests use small synthetic pgsc_calc outputs in `tests/fixtures'
+Tests use small synthetic pgsc_calc outputs in `tests/fixtures`.
 
 ## License
 

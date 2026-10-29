@@ -1,0 +1,9 @@
+dataset,accession,score_pass,match_status,ambiguous,is_multiallelic,duplicate_best_match,duplicate_ID,match_flipped,match_IDs,count,percent
+EXAMPLE,large_effect_loss_hmPOS_GRCh38,true,matched,false,false,false,false,false,NA,72,72.0
+EXAMPLE,large_effect_loss_hmPOS_GRCh38,true,matched,true,false,false,false,false,NA,6,6.0
+EXAMPLE,large_effect_loss_hmPOS_GRCh38,true,matched,false,false,false,false,true,NA,4,4.0
+EXAMPLE,large_effect_loss_hmPOS_GRCh38,true,unmatched,,,,,,,18,18.0
+EXAMPLE,mostly_clean_hmPOS_GRCh38,true,matched,false,false,false,false,false,NA,59,98.33333333333333
+EXAMPLE,mostly_clean_hmPOS_GRCh38,true,unmatched,,,,,,,1,1.6666666666666667
+EXAMPLE,hla_small_hmPOS_GRCh38,true,matched,false,false,false,false,false,NA,12,80.0
+EXAMPLE,hla_small_hmPOS_GRCh38,true,unmatched,,,,,,,3,20.0

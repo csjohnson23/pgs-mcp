@@ -1,7 +1,6 @@
 # Interpreting pgsc_calc match QC
 
-> **Status: draft.** This guide encodes domain judgement and is meant to be reviewed and
-> extended by PGS practitioners. Contributions welcome.
+> This guide encodes domain judgement. Contributions from PGS practitioners are welcome.
 
 This guide is for interpreting the output of the `assess_match_qc` tool. The tool reports
 raw numbers and structural warnings. Your job is to explain what the numbers mean for *this*
